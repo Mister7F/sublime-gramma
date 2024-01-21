@@ -26,6 +26,9 @@ class GrammaCommand(sublime_plugin.TextCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         w = self.view.window()
+        if not w:
+            self.panel = None
+            return
         self.panel = w.create_output_panel("gramma_result", unlisted=True)
         self.panel.settings().set("gutter", False)
         self.panel.settings().set("scroll_past_end", False)
@@ -46,7 +49,7 @@ class GrammaCommand(sublime_plugin.TextCommand):
         self.panel.set_read_only(True)
 
     def run(self, edit):
-        if self.is_running:
+        if self.is_running or not self.panel:
             return
 
         self.is_running = True
