@@ -6,10 +6,28 @@ import string
 import threading
 import os
 import random
+import time
+import re
 
+
+zero_width = "\u200B"
 to_clean = {"%s", "%i", "%r"}
-to_clean_dots = {":param", ":rtype:"}
+to_clean_dots = {":rtype:"}
 to_ignore = {"UPPERCASE_SENTENCE_START", "WHITESPACE_RULE", "ARROWS"}
+to_clean_re = [  # regex to clean the strings
+    # ^.{0,3} for """ and ''' in python
+    (r"^'+", zero_width),  # triple quotes
+    (r'^"+', zero_width),  # triple quotes
+    (r"'+$", zero_width),  # triple quotes
+    (r'"+$', zero_width),  # triple quotes
+    (r"^#", zero_width),  # python comment
+    # code example ">>> print('Hello world')"
+    (r"(^|\n)(\s|%s)*>>>\s.*" % zero_width, " "),
+    (r"\bhttp(s)?:\/\/(\w|[-./?=#])+", " "),  # urn
+    (r"(\.?\/?)(([\w-])+\/)+([\w-])*", " "),  # path
+    (r":param ([\w_])+:", "."),  # docstring
+]
+
 
 class GrammaCommand(sublime_plugin.TextCommand):
     def __init__(self, *args, **kwargs):
@@ -70,7 +88,7 @@ def _lint_file(view, running):
     running[view_id] = 1
     error_regions = []
     annotations = []
-    for region in view.find_by_selector("string, comment"):
+    for region in view.find_by_selector("string, comment, text.git.commit"):
         start, end = region.to_tuple()
         content = view.substr(region)
         result = smart_language_tool(content)
@@ -92,10 +110,12 @@ def _lint_file(view, running):
         annotations=annotations,
     )
 
-    re_run = running.get(view_id) == 2
-    running[view_id] = 0
     view.set_status("gramma", "")
 
+    time.sleep(0.2)  # debounce
+
+    re_run = running.get(view_id) == 2
+    running[view_id] = 0
     if re_run:
         _lint_file(view, running)
 
@@ -116,6 +136,9 @@ def smart_language_tool(text):
 
     for c in to_clean_dots:
         text = text.replace(c, "." * len(c))
+
+    for regex, fill in to_clean_re:
+        text = re.sub(regex, lambda x: fill * len(x.group()), text)
 
     return language_tool(text)
 
