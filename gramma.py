@@ -3,7 +3,12 @@ import requests
 import sublime_plugin
 from functools import lru_cache
 import string
+import threading
+import os
+import random
 
+to_clean = {"%s", "%i", "%r", ":param"}
+to_ignore = {"UPPERCASE_SENTENCE_START", "WHITESPACE_RULE", "ARROWS"}
 
 class GrammaCommand(sublime_plugin.TextCommand):
     def __init__(self, *args, **kwargs):
@@ -17,6 +22,9 @@ class GrammaCommand(sublime_plugin.TextCommand):
         self.panel.settings().set("scroll_past_end", False)
         self.panel.settings().set("margin", 10)
         self.is_running = False
+        self.re_run = False
+        # store a hash of the content of each region to know if it should be updater or not
+        self.regions = {}
 
     def _get_selection(self):
         selection = "\n".join(self.view.substr(sel) for sel in self.view.sel())
@@ -32,45 +40,76 @@ class GrammaCommand(sublime_plugin.TextCommand):
         self.panel.set_read_only(True)
 
     def run(self, edit):
-        if self.is_running or not self.panel:
-            return
-
-        # error_regions = []
-        # annotations = []
-        # for region in self.view.find_by_selector("string, comment"):
-        #     start, end = region.to_tuple()
-        #     result = smart_language_tool(self.view.substr(region))
-        #     for context, replacements, rule, start_str, size_str in result:
-        #         error_regions.append(
-        #             sublime.Region(start + start_str, start + start_str + size_str)
-        #         )
-        #         annotations.append(trim(replacements, 20))
-
-        # self.view.add_regions(
-        #     "gramma-reports",
-        #     error_regions,
-        #     icon="",
-        #     scope="region.yellowish",
-        #     flags=sublime.DRAW_SQUIGGLY_UNDERLINE
-        #     | sublime.DRAW_NO_FILL
-        #     | sublime.DRAW_NO_OUTLINE,
-        #     annotations=annotations,
-        # )
-        # return
-        # return
-
-        self.is_running = True
-        text = self._get_selection()
-
-        self._set_text(result_to_str(language_tool(text)))
+        self._set_text(result_to_str(language_tool(self._get_selection())))
         self.view.window().run_command("show_panel", {"panel": "output.gramma_result"})
-        self.is_running = False
+
+
+class SublimeGramma(sublime_plugin.EventListener):
+    def __init__(self):
+        super().__init__()
+        # allow one thread per view (0: not running, 1: running, 2: need to re-run)
+        self.running = {}
+
+    def on_activated_async(self, view):
+        threading.Thread(target=_lint_file, args=(view, self.running)).start()
+
+    def on_modified(self, view):
+        threading.Thread(target=_lint_file, args=(view, self.running)).start()
+
+
+def _lint_file(view, running):
+    view_id = view.id()
+    if running.get(view_id):
+        # already running, trigger a re-run when we are done
+        running[view_id] = 2
+        return
+
+    view.set_status("gramma", "Checking grammar")
+
+    running[view_id] = 1
+    error_regions = []
+    for region in view.find_by_selector("string, comment"):
+        start, end = region.to_tuple()
+        content = view.substr(region)
+        result = smart_language_tool(content)
+        for context, replacements, rule, start_str, size_str in result:
+            error_regions.append(
+                sublime.Region(start + start_str, start + start_str + size_str)
+            )
+
+    view.add_regions(
+        "gramma-reports",
+        error_regions,
+        icon="",
+        scope="region.yellowish",
+        flags=sublime.DRAW_SQUIGGLY_UNDERLINE
+        | sublime.DRAW_NO_FILL
+        | sublime.DRAW_NO_OUTLINE,
+        annotations=[],
+    )
+
+    re_run = running.get(view_id) == 2
+    running[view_id] = 0
+    view.set_status("gramma", "")
+
+    if re_run:
+        _lint_file(view, running)
 
 
 def smart_language_tool(text):
     """Skip if the text is detected as non-English (e.g. technical strings)."""
-    if len([t for t in text if t in string.ascii_letters]) < 3:
+    letter_only = "".join(t for t in text if t in string.ascii_letters + " ").strip()
+    if len(letter_only) < 3:
         return []
+
+    if " " not in letter_only or letter_only.count(" ") < 2:
+        # let the spell check do its work
+        return []
+
+    for c in to_clean:
+        # important to not change the size for the parsing
+        text = text.replace(c, " " * len(c))
+
     return language_tool(text)
 
 
@@ -80,7 +119,7 @@ def language_tool(text):
     # docker run  --detach --restart always -it -p 8010:8010 erikvl87/languagetool
 
     start_at = len("Ok, ")
-    text = "Ok, %s" % text  # ignore missing capital letter
+    text = "OK, %s" % text  # ignore missing capital letter
 
     url = "http://localhost:8010/v2/check"
 
@@ -89,22 +128,16 @@ def language_tool(text):
         print("Error %i, %r" % (response.status_code, response.text))
         return []
 
-    to_ignore = {"UPPERCASE_SENTENCE_START", "WHITESPACE_RULE"}
-
-    lt_result = response.json()
-    # print(lt_result)
-
     matches = [
         match
-        for match in lt_result.get("matches", [])
+        for match in response.json().get("matches", [])
         if match["rule"]["id"] not in to_ignore
     ]
 
     result = []
     for match in matches:
-        # print(json.dumps(match, indent=4))
-        offset = match["context"]["offset"]
-        size = match["context"]["length"]
+        offset = match["offset"]
+        size = match["length"]
         context = match["context"]["text"][offset : offset + size]
         replacements = ", ".join(r["value"] for r in match["replacements"])
         result.append((context, replacements, match["rule"], offset - start_at, size))
