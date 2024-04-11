@@ -7,7 +7,8 @@ import threading
 import os
 import random
 
-to_clean = {"%s", "%i", "%r", ":param"}
+to_clean = {"%s", "%i", "%r"}
+to_clean_dots = {":param", ":rtype:"}
 to_ignore = {"UPPERCASE_SENTENCE_START", "WHITESPACE_RULE", "ARROWS"}
 
 class GrammaCommand(sublime_plugin.TextCommand):
@@ -68,6 +69,7 @@ def _lint_file(view, running):
 
     running[view_id] = 1
     error_regions = []
+    annotations = []
     for region in view.find_by_selector("string, comment"):
         start, end = region.to_tuple()
         content = view.substr(region)
@@ -76,6 +78,8 @@ def _lint_file(view, running):
             error_regions.append(
                 sublime.Region(start + start_str, start + start_str + size_str)
             )
+            # annotations.append(trim(replacements.strip(), 20))
+            # print(context, rule)
 
     view.add_regions(
         "gramma-reports",
@@ -85,7 +89,7 @@ def _lint_file(view, running):
         flags=sublime.DRAW_SQUIGGLY_UNDERLINE
         | sublime.DRAW_NO_FILL
         | sublime.DRAW_NO_OUTLINE,
-        annotations=[],
+        annotations=annotations,
     )
 
     re_run = running.get(view_id) == 2
@@ -110,6 +114,9 @@ def smart_language_tool(text):
         # important to not change the size for the parsing
         text = text.replace(c, " " * len(c))
 
+    for c in to_clean_dots:
+        text = text.replace(c, "." * len(c))
+
     return language_tool(text)
 
 
@@ -118,7 +125,7 @@ def language_tool(text):
     # docker pull erikvl87/languagetool
     # docker run  --detach --restart always -it -p 8010:8010 erikvl87/languagetool
 
-    start_at = len("Ok, ")
+    start_at = len("OK, ")
     text = "OK, %s" % text  # ignore missing capital letter
 
     url = "http://localhost:8010/v2/check"
