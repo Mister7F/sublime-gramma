@@ -120,7 +120,7 @@ def _lint_file(view, running):
     running[view_id] = 1
     error_regions = []
     annotations = []
-    for region in view.find_by_selector("string, comment, text.git.commit"):
+    for region in view.find_by_selector("string, comment, text.git.commit, text.plain"):
         start, end = region.to_tuple()
         content = view.substr(region)
         scope = view.scope_name(region.a)  # source.python, source.js
@@ -157,7 +157,9 @@ def _lint_file(view, running):
 
 def smart_language_tool(text, scope):
     """Skip if the text is detected as non-English (e.g. technical strings)."""
-    letter_only = "".join(t for t in text if t in string.ascii_letters + " ").strip()
+    letter_only = "".join(
+        t for t in text.replace("\n", " ") if t in string.ascii_letters + " "
+    ).strip()
     if len(letter_only) < 3:
         return []
 
