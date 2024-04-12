@@ -25,3 +25,7 @@ Key binding example,
 ```json
 { "keys": ["ctrl+g"], "command": "gramma"},
 ```
+
+# Add words
+This plugin load the same list used by the default spell checker, `added_words` and `ignored_words`.
+So to add a word, do right click, "Add xxxxx" / "Ignore xxxxx" (this need a restart to reload the change).

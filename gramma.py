@@ -22,11 +22,23 @@ to_clean_re = [  # regex to clean the strings
     (r'"+$', zero_width),  # triple quotes
     (r"^#", zero_width),  # python comment
     # code example ">>> print('Hello world')"
-    (r"(^|\n)(\s|%s)*>>>\s.*" % zero_width, " "),
+    (r"(^|\n)(\s|%s)*>>>\s\S.*" % zero_width, " "),
     (r"\bhttp(s)?:\/\/(\w|[-./?=#])+", " "),  # urn
     (r"(\.?\/?)(([\w-])+\/)+([\w-])*", " "),  # path
     (r":param ([\w_])+:", "."),  # docstring
 ]
+
+# additional words to add
+
+
+whitelist = set()
+
+
+def plugin_loaded():
+    global whitelist
+    settings = sublime.load_settings("Preferences.sublime-settings")
+    whitelist = set(settings.get("added_words") or ())
+    whitelist |= set(settings.get("ignored_words") or ())
 
 
 class GrammaCommand(sublime_plugin.TextCommand):
@@ -168,7 +180,11 @@ def language_tool(text):
     for match in matches:
         offset = match["offset"]
         size = match["length"]
-        context = match["context"]["text"][offset : offset + size]
+        context = text[offset : offset + size]
+        if match["type"]["typeName"] == "UnknownWord" and context in whitelist:
+            # the word has been added in the whitelist
+            continue
+
         replacements = ", ".join(r["value"] for r in match["replacements"])
         result.append((context, replacements, match["rule"], offset - start_at, size))
 
