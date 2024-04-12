@@ -167,8 +167,8 @@ def smart_language_tool(text, scope):
 
     for quote in to_clean_quotes:
         if text.startswith(quote):
-            text = re.sub(r"^%s+" % quote, lambda x: zero_width * len(x.group()), text)
-            text = re.sub(r"%s+$" % quote, lambda x: zero_width * len(x.group()), text)
+            text = re.sub(r"^%s+" % quote, lambda x: "\n" * len(x.group()), text)
+            text = re.sub(r"%s+$" % quote, lambda x: "\n" * len(x.group()), text)
             break
 
     for target_scope, items in to_clean.items():
@@ -181,7 +181,6 @@ def smart_language_tool(text, scope):
 
         for regex, fill in items.get("regex", []):
             text = re.sub(regex, lambda x: fill * len(x.group()), text)
-
     return language_tool(text)
 
 
@@ -190,8 +189,9 @@ def language_tool(text):
     # docker pull erikvl87/languagetool
     # docker run  --detach --restart always -it -p 8010:8010 erikvl87/languagetool
 
-    start_at = len("OK, ")
-    text = "OK, %s" % text  # ignore missing capital letter
+    # ignore missing capital letter (and still catch error for misspelling words, e.g. "bob")
+    start_at = len("OK,\n")
+    text = "OK,\n%s" % text
 
     url = "http://localhost:8010/v2/check"
 
