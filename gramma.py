@@ -11,22 +11,42 @@ import re
 
 
 zero_width = "\u200B"
-to_clean = {"%s", "%i", "%r"}
-to_clean_dots = {":rtype:"}
+
+to_clean_quotes = ['"', "'", "`"]
+
+to_clean = {
+    "*": {
+        # (match, char) to fill
+        "words": [("%s", " "), ("%i", " "), ("%r", " ")],
+        "regex": [
+            # code example "`F(x)`"
+            (r"`(.*?)`", zero_width),
+            # code example ">>> print('Hello world')"
+            (r"(^|\n)(\s|%s)*>>>\s\S.*" % zero_width, " "),
+            (r"\bhttp(s)?:\/\/(\w|[-./?=#])+", " "),  # urn
+            (r"(\.?\/?)(([\w-])+\/)+([\w-])*", " "),  # path
+        ],
+    },
+    "source.python": {
+        "words": [(":rtype:", ".")],
+        "regex": [
+            (r"^#", zero_width),  # python comment
+            (r":param ([\w_])+:", "."),  # docstring
+        ],
+    },
+    "source.js": {
+        "regex": [
+            (r"^\/\*{2}", zero_width),  # JS comment
+            (r"^\/\/", zero_width),  # JS comment
+            (r"(^|\n)\s*\*\/", zero_width),  # JS comment
+            (r"(^|\n)\s*\*", zero_width),  # JS comment
+        ],
+    },
+}
+
+
 to_ignore = {"UPPERCASE_SENTENCE_START", "WHITESPACE_RULE", "ARROWS"}
-to_clean_re = [  # regex to clean the strings
-    # ^.{0,3} for """ and ''' in python
-    (r"^'+", zero_width),  # triple quotes
-    (r'^"+', zero_width),  # triple quotes
-    (r"'+$", zero_width),  # triple quotes
-    (r'"+$', zero_width),  # triple quotes
-    (r"^#", zero_width),  # python comment
-    # code example ">>> print('Hello world')"
-    (r"(^|\n)(\s|%s)*>>>\s\S.*" % zero_width, " "),
-    (r"\bhttp(s)?:\/\/(\w|[-./?=#])+", " "),  # urn
-    (r"(\.?\/?)(([\w-])+\/)+([\w-])*", " "),  # path
-    (r":param ([\w_])+:", "."),  # docstring
-]
+
 
 # additional words to add
 
@@ -103,7 +123,10 @@ def _lint_file(view, running):
     for region in view.find_by_selector("string, comment, text.git.commit"):
         start, end = region.to_tuple()
         content = view.substr(region)
-        result = smart_language_tool(content)
+        scope = view.scope_name(region.a)  # source.python, source.js
+
+        result = smart_language_tool(content, scope)
+
         for context, replacements, rule, start_str, size_str in result:
             error_regions.append(
                 sublime.Region(start + start_str, start + start_str + size_str)
@@ -132,7 +155,7 @@ def _lint_file(view, running):
         _lint_file(view, running)
 
 
-def smart_language_tool(text):
+def smart_language_tool(text, scope):
     """Skip if the text is detected as non-English (e.g. technical strings)."""
     letter_only = "".join(t for t in text if t in string.ascii_letters + " ").strip()
     if len(letter_only) < 3:
@@ -142,15 +165,22 @@ def smart_language_tool(text):
         # let the spell check do its work
         return []
 
-    for c in to_clean:
-        # important to not change the size for the parsing
-        text = text.replace(c, " " * len(c))
+    for quote in to_clean_quotes:
+        if text.startswith(quote):
+            text = re.sub(r"^%s+" % quote, lambda x: zero_width * len(x.group()), text)
+            text = re.sub(r"%s+$" % quote, lambda x: zero_width * len(x.group()), text)
+            break
 
-    for c in to_clean_dots:
-        text = text.replace(c, "." * len(c))
+    for target_scope, items in to_clean.items():
+        if target_scope != "*" and target_scope not in scope:
+            continue
 
-    for regex, fill in to_clean_re:
-        text = re.sub(regex, lambda x: fill * len(x.group()), text)
+        for c, f in items.get("words", []):
+            # important to not change the size for the parsing
+            text = text.replace(c, f * len(c))
+
+        for regex, fill in items.get("regex", []):
+            text = re.sub(regex, lambda x: fill * len(x.group()), text)
 
     return language_tool(text)
 

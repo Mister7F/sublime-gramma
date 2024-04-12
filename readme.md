@@ -29,3 +29,7 @@ Key binding example,
 # Add words
 This plugin load the same list used by the default spell checker, `added_words` and `ignored_words`.
 So to add a word, do right click, "Add xxxxx" / "Ignore xxxxx" (this need a restart to reload the change).
+
+# Ignored
+To avoid false positive, some regex are used to clean to checked text
+(to remove URLs, file paths, docstring parameters, code example starting with `>>> `, code example between ``` ` ```...)
