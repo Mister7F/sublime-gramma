@@ -31,7 +31,7 @@ to_clean = {
         "words": [(":rtype:", ".")],
         "regex": [
             (r"^#", zero_width),  # python comment
-            (r":param ([\w_])+:", "."),  # docstring
+            (r":param(\s[\w_]+){1,2}:", "."),  # docstring
         ],
     },
     "source.js": {
