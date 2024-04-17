@@ -117,10 +117,19 @@ def _lint_file(view, running):
 
     view.set_status("gramma", "Checking grammar")
 
+    # https://www.sublimetext.com/docs/selectors.html
+    selector = "string, comment, text.git.commit, text.plain"
+
+    syntax = view.syntax()
+    if syntax and syntax.name.lower() == "xml":
+        selector = "text.xml - meta.tag.xml - entity.name.tag.xml"
+    elif syntax and syntax.name.lower() == "html":
+        selector = "meta.string.html, text.html.basic - (meta.block.js - meta.string.js - comment.block.documentation.js - comment.line.double-slash.js) - meta.attribute-with-value.html"
+
     running[view_id] = 1
     error_regions = []
     annotations = []
-    for region in view.find_by_selector("string, comment, text.git.commit, text.plain"):
+    for region in view.find_by_selector(selector):
         start, end = region.to_tuple()
         content = view.substr(region)
         scope = view.scope_name(region.a)  # source.python, source.js
