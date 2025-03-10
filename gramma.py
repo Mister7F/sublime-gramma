@@ -3,6 +3,7 @@ import requests
 import sublime_plugin
 from functools import lru_cache
 import string
+import itertools
 import threading
 import os
 import random
@@ -10,7 +11,7 @@ import time
 import re
 
 
-zero_width = "\u200B"
+zero_width = "\u200b"
 
 to_clean_quotes = ['"', "'", "`"]
 
@@ -91,7 +92,9 @@ class GrammaCommand(sublime_plugin.TextCommand):
         self.panel.set_read_only(True)
 
     def run(self, edit):
-        self._set_text(result_to_str(language_tool(self._get_selection())))
+        self._set_text(
+            result_to_str(language_tool(technical_to_english(self._get_selection())))
+        )
         self.view.window().run_command("show_panel", {"panel": "output.gramma_result"})
 
 
@@ -252,3 +255,12 @@ def trim(string, size):
     if len(string) < size:
         return string
     return string[: size - 3] + "..."
+
+
+def technical_to_english(text):
+    text = text.replace("_", " ")
+    text = "".join(
+        a + " " if not a.isupper() and b.isupper() else a
+        for a, b in zip(text, text[1:] + " ")  # TODO: use itertools.pairwise
+    )
+    return re.sub(r"\s+", " ", text)
