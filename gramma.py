@@ -124,10 +124,10 @@ def _lint_file(view, running):
     selector = "string, comment, text.git.commit, text.plain"
 
     syntax = view.syntax()
-    if syntax and syntax.name.lower() == "xml":
+    if syntax and "xml" in syntax.name.lower():
         selector = "text.xml - meta.tag.xml - entity.name.tag.xml"
-    elif syntax and syntax.name.lower() == "html":
-        selector = "meta.string.html, text.html.basic - (meta.block.js - meta.string.js - comment.block.documentation.js - comment.line.double-slash.js) - meta.attribute-with-value.html"
+    elif syntax and "html" in syntax.name.lower():
+        selector = "meta.string.html, text.html.basic - (meta.block.js - meta.string.js - comment.block.documentation.js - comment.line.double-slash.js) - meta.attribute-with-value.html - meta.class-name"
 
     running[view_id] = 1
     error_regions = []

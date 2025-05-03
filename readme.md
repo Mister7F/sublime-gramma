@@ -14,6 +14,9 @@ Install Language Tool
 
 > docker run  --detach --restart always -it -p 8010:8010 erikvl87/languagetool
 
+With podman
+> podman run --detach --restart always -it -p 8010:8010 docker.io/erikvl87/languagetool
+
 # Usage
 Select the text you want to verify and press CTRL + G.
 
