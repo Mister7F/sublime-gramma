@@ -1,3 +1,4 @@
+import select
 import sublime
 import requests
 import sublime_plugin
@@ -121,13 +122,19 @@ def _lint_file(view, running):
     view.set_status("gramma", "Checking grammar")
 
     # https://www.sublimetext.com/docs/selectors.html
-    selector = "string, comment, text.git.commit, text.plain"
+    selectors = setting(
+        "gramma-selectors",
+        view,
+        "string, comment, text.git.commit, text.plain",
+    )
 
-    syntax = view.syntax()
-    if syntax and "xml" in syntax.name.lower():
-        selector = "text.xml - meta.tag.xml - entity.name.tag.xml"
-    elif syntax and "html" in syntax.name.lower():
-        selector = "meta.string.html, text.html.basic - (meta.block.js - meta.string.js - comment.block.documentation.js - comment.line.double-slash.js) - meta.attribute-with-value.html - meta.class-name"
+    selector = None
+    for syntax_re, selector_i in selectors.items():
+        if re.match(syntax_re, view.syntax().name.lower()):
+            selector = selector_i
+
+    if not selector:
+        return
 
     running[view_id] = 1
     error_regions = []
@@ -264,3 +271,9 @@ def technical_to_english(text):
         for a, b in zip(text, text[1:] + " ")  # TODO: use itertools.pairwise
     )
     return re.sub(r"\s+", " ", text)
+
+
+def setting(name, view, default=None):
+    # Load settings from the user preferences first, and then from the Jumper settings
+    default = sublime.load_settings("Gramma.sublime-settings").get(name, default)
+    return view.settings().get(name, default)

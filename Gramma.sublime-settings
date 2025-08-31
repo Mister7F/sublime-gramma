@@ -1,0 +1,8 @@
+{
+    "gramma-selectors": {
+        // Syntax regex: sublime selector
+        ".*": "string, comment, text.git.commit, text.plain",
+        "xml": "text.xml - meta.tag.xml - entity.name.tag.xml",
+        "html": "meta.string.html, text.html.basic - (meta.block.js - meta.string.js - comment.block.documentation.js - comment.line.double-slash.js) - meta.attribute-with-value.html - meta.class-name",
+    },
+}
