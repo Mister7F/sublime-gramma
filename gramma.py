@@ -130,7 +130,7 @@ def _lint_file(view, running):
 
     selector = None
     for syntax_re, selector_i in selectors.items():
-        if re.match(syntax_re, view.syntax().name.lower()):
+        if re.match(syntax_re, view.syntax().name.lower() if view.syntax() else ''):
             selector = selector_i
 
     if not selector:
