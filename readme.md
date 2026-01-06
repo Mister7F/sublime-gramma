@@ -10,12 +10,12 @@ Check the grammar in your strings / comments (or select the text if you want to 
 Go to the directory `Packages`, in the configuration directory of sublime, and git clone this repo.
 
 Install Language Tool
-> docker pull erikvl87/languagetool
+> `docker pull erikvl87/languagetool`
 
-> docker run  --detach --restart always -it -p 8010:8010 erikvl87/languagetool
+> `docker run  --detach --restart always --name=languagetool -p 127.0.0.1:8010:8010 erikvl87/languagetool`
 
 With podman
-> podman run --detach --restart always -it -p 8010:8010 docker.io/erikvl87/languagetool
+> `podman run --detach --restart always --name=languagetool -p 127.0.0.1:8010:8010 docker.io/erikvl87/languagetool`
 
 # Usage
 Select the text you want to verify and press CTRL + G.
